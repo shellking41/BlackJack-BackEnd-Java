@@ -1,6 +1,7 @@
 package com.casino.blackjack.Service;
 
 import com.casino.blackjack.DTO.CardResponse;
+import com.casino.blackjack.Event.DrawCardEvent;
 import com.casino.blackjack.Exception.UserNotFoundException;
 import com.casino.blackjack.Model.Card;
 import com.casino.blackjack.Model.Enums.CardType;
@@ -18,6 +19,7 @@ import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -40,6 +42,7 @@ public class CardService {
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final AuthenticationService authenticationService;
+    private final ApplicationEventPublisher eventPublisher;
 
 
 
@@ -48,14 +51,14 @@ public class CardService {
         User user=authenticationService.getAuthenticatedUser();
 
         Map<String,Object> response=new HashMap<>();
-        Stream<Card> playerCards=user.getGameState().getPlayerCards().stream().filter(card -> card.getCardType().equals(CardType.PLAYER));
-        Stream<Card> dealerCards=user.getGameState().getDealerCards().stream().filter(card -> card.getCardType().equals(CardType.DEALER));
+        Stream<Card> playerCards=user.getGameState().getCards().stream().filter(card -> card.getCardType().equals(CardType.PLAYER));
+        Stream<Card> dealerCards=user.getGameState().getCards().stream().filter(card -> card.getCardType().equals(CardType.DEALER));
         response.put("PlayerCards",playerCards);
         response.put("DealerCards",dealerCards);
         return response;
     }
     @Transactional
-    public CardResponse NewCard() {
+    public CardResponse DrawCard() {
         //itt megszerezzuk a usert es megnezzuk hogy van e létezik e game
         User user=authenticationService.getAuthenticatedUser();
         GameState gameState = user.getGameState();
@@ -63,18 +66,14 @@ public class CardService {
             throw new IllegalStateException("The game is finished or User has no associated GameState.");
         }
 
-        Card card = RandomCard();
+        Card card = RandomCard(gameState);
         //ha a felhasznalo nem standelt akkor a playerkartyakat huzzon es szamolaj a erteket es ha igen a dealer
         if(!gameState.isStand()) {
-            card.setCardType(CardType.PLAYER);
-            gameState.setPlayerCardsWorth(updateCardsWorth(gameState.getPlayerCardsWorth(), card));
+            eventPublisher.publishEvent(new DrawCardEvent(this,gameState.getPlayerCardsWorth(),card,gameState.getId()));
         }else{
-            card.setCardType(CardType.DEALER);
-            gameState.setDealerCardsWorth(updateCardsWorth(gameState.getDealerCardsWorth(), card));
+            eventPublisher.publishEvent(new DrawCardEvent(this,gameState.getDealerCardsWorth(),card,gameState.getId()));
         }
 
-        card.setGameState(gameState);
-        gameState.getPlayerCards().add(card);
         logger.info("New player card created: {} for user: {}", card, user.getEmail());
 
         cardRepository.save(card);
@@ -91,48 +90,24 @@ public class CardService {
                 .worth(values)
                 .build();
     }
-    //itt ossze adjuk a kartya erteket a gamestateba talalhato ertekkel
-    private String updateCardsWorth(String cardsWorth,Card card){
-        int worth = 0;
-        try {
-            worth = Integer.parseInt(cardsWorth);
-        } catch (NumberFormatException e) {
-            logger.error("Invalid value for cardsWorth: {}", cardsWorth, e);
-        }
-        int cardValue=Integer.parseInt(countCardValue(card));
-        return String.valueOf(worth+cardValue);
-    }
-
-    private String countCardValue(Card card){
-        String cardValue=card.getValue();
-
-        Set<String> faceCards=Set.of("J","Q","K");
-
-        if(cardValue.equals("A")){
-            return "11";
-        }
-        else if(faceCards.contains(cardValue)){
-            return "10";
-        }
-        else{
-            return cardValue;
-        }
 
 
-    }
 
-    protected Card RandomCard(){
-        Symbol[] symbols=Symbol.values();
-        String[] values={"2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"};
+    protected Card RandomCard(GameState gameState){
+        Symbol[] symbols = Symbol.values();
+        String[] values = {"2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"};
 
-        Random random=new Random();
-        Symbol randomSymbol=symbols[random.nextInt(symbols.length)];
-        String randomValue=values[random.nextInt(values.length)];
+        Random random = new Random();
+        Symbol randomSymbol = symbols[random.nextInt(symbols.length)];
+        String randomValue = values[random.nextInt(values.length)];
+        CardType cardType = gameState.isStand() ? CardType.DEALER : CardType.PLAYER;
 
         return Card.builder()
                 .value(randomValue)
                 .symbol(randomSymbol)
                 .flipped(false)
+                .cardType(cardType)
+                .gameState(gameState)
                 .build();
     }
 

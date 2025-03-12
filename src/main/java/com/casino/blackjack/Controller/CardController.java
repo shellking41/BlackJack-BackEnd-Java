@@ -18,10 +18,10 @@ public class CardController {
 
 
 
-    @PostMapping("/NewCard")
-    public CardResponse NewCard() {
+    @PostMapping("/DrawCard")
+    public CardResponse DrawCard() {
 
-        return cardService.NewCard();
+        return cardService.DrawCard();
     }
 
     @GetMapping("/AllCard")

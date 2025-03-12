@@ -2,8 +2,12 @@ package com.casino.blackjack.Service;
 
 import com.casino.blackjack.DTO.GameStateRequest;
 import com.casino.blackjack.DTO.GameStateResponse;
+import com.casino.blackjack.Event.DrawCardEvent;
 import com.casino.blackjack.Event.GameStartedEvent;
+import com.casino.blackjack.Exception.GameStateNotFoundException;
 import com.casino.blackjack.Exception.UserNotFoundException;
+import com.casino.blackjack.Model.Card;
+import com.casino.blackjack.Model.Enums.CardType;
 import com.casino.blackjack.Model.Enums.GameStatus;
 import com.casino.blackjack.Model.GameState;
 import com.casino.blackjack.Model.User;
@@ -18,9 +22,12 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -32,17 +39,15 @@ public class GameStateService {
     private final UserRepository userRepository;
     private final AuthenticationService authenticationService;
     private final ApplicationEventPublisher eventPublisher;
+    private final CardService cardService;
 
     @Transactional
     public GameStateResponse StartGame(GameStateRequest gameStateRequest){
-
-
 
         GameState gameState=GameState
                 .builder()
                 .isGameOver(false)
                 .status(GameStatus.Active)
-
                 .currentBet(gameStateRequest.getCurrentBet())
                 .build();
 
@@ -74,7 +79,7 @@ public class GameStateService {
         GameState gameState = user.getGameState();
 
         if (gameState == null) {
-            throw new IllegalStateException("Game does not exist for this user.");
+            throw new GameStateNotFoundException("Game does not exist for this user.");
         }
 
         if (gameState.getIsGameOver()) {
@@ -92,4 +97,46 @@ public class GameStateService {
 	            .build();
     }
 
+
+    @EventListener
+    @Transactional
+    //itt ossze adjuk a kartya erteket a gamestateba talalhato ertekkel
+    protected void updateGameStateWithCard(DrawCardEvent event){
+
+        GameState gameState=gameStateRepository.findById(event.getGameStateId())
+                .orElseThrow(()->new GameStateNotFoundException("Game not found"));
+
+        Card card=event.getCard();
+        String cardsWorth=event.getCardsWorth();
+        int worth = Integer.parseInt(cardsWorth);
+        int cardValue=Integer.parseInt(countCardValue(card));
+
+
+        gameState.getCards().add(card);
+        List<Card> cards=gameState.getCards();
+
+        if (card.getCardType() == CardType.PLAYER) {
+            gameState.setPlayerCardsWorth(String.valueOf(worth + cardValue));
+        } else if (card.getCardType() == CardType.DEALER) {
+            gameState.setDealerCardsWorth(String.valueOf(worth + cardValue));
+        }
+
+         gameStateRepository.save(gameState);
+    }
+
+    private String countCardValue(Card card){
+        String cardValue=card.getValue();
+
+        Set<String> faceCards=Set.of("J","Q","K");
+
+        if(cardValue.equals("A")){
+            return "11";
+        }
+        else if(faceCards.contains(cardValue)){
+            return "10";
+        }
+        else{
+            return cardValue;
+        }
+    }
 }

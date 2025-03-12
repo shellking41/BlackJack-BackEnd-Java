@@ -38,10 +38,9 @@ public class GameState {
     private BigDecimal currentBet= BigDecimal.ZERO;
 
     @OneToMany(mappedBy = "gameState", cascade = CascadeType.ALL)
-    private List<Card> playerCards=new ArrayList<>();
+    private List<Card> Cards=new ArrayList<>();
 
-    @OneToMany(mappedBy = "gameState", cascade = CascadeType.ALL)
-    private List<Card> dealerCards=new ArrayList<>();
+
 
     @PrePersist
     protected void onCreate(){

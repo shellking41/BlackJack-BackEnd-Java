@@ -96,6 +96,18 @@ public ResponseEntity<Map<String,Object>> handleHttpMessageNotReadableException(
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
+
+    @ExceptionHandler(GameStateNotFoundException.class)
+
+    public ResponseEntity<Map<String,Object>> GameStateNotFoundException(GameStateNotFoundException ex){
+        errorResponse.put("timeStamp",LocalDateTime.now());
+        errorResponse.put("status",HttpStatus.NOT_FOUND.value());
+        errorResponse.put("error","Not Found");
+        errorResponse.put("message",ex.getMessage());
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String,Object>> handleGlobalException(Exception ex){
 
