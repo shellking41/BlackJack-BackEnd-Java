@@ -8,6 +8,7 @@ import com.casino.blackjack.Exception.GameStateNotFoundException;
 import com.casino.blackjack.Model.Card;
 import com.casino.blackjack.Model.Enums.CardType;
 import com.casino.blackjack.Model.Enums.GameStatus;
+import com.casino.blackjack.Model.Game.BlackJackGameEngine;
 import com.casino.blackjack.Model.Game.HandValue;
 import com.casino.blackjack.Model.GameState;
 import com.casino.blackjack.Model.User;
@@ -40,6 +41,7 @@ public class GameStateService {
     private final AuthenticationService authenticationService;
     private final ApplicationEventPublisher eventPublisher;
     private final CardService cardService;
+    private final BlackJackGameEngine blackJackGameEngine=new BlackJackGameEngine();
 
     @Transactional
     public GameStateResponse startGame(GameStateRequest gameStateRequest){
@@ -95,9 +97,6 @@ public class GameStateService {
         gameState.setStand(true);
         gameState.setPlayerCardsWorth(String.valueOf(parseHandValue(gameState.getPlayerCardsWorth()).getBestValue()));
 
-
-
-
         // Dealer kártyáinak automatikus felfordítása
         dealerCards.forEach(card -> {
             if (!card.getFlipped()) {
@@ -137,43 +136,15 @@ public class GameStateService {
         gameState.getCards().add(card);
 
         if (cardType == CardType.PLAYER) {
-            gameState.setPlayerCardsWorth(countCardValue(gameState,cardType).toString());
+            gameState.setPlayerCardsWorth(blackJackGameEngine.countCardValue(gameState,cardType).toString());
         } else if (cardType == CardType.DEALER) {
-            gameState.setDealerCardsWorth(countCardValue(gameState,cardType).toString());
+            gameState.setDealerCardsWorth(blackJackGameEngine.countCardValue(gameState,cardType).toString());
         }
 
          gameStateRepository.save(gameState);
     }
 
-    private HandValue countCardValue(GameState gameState, CardType cardType){
-       List<Card> cards=gameState.getCards().stream()
-               .filter(c->c.getFlipped() && c.getCardType()==cardType)
-               .toList();
 
-       int total=0;
-       int acesCount=0;
-
-        for (Card c: cards){
-            if(c.getValue().equals("A")){
-                acesCount+=1;
-            }
-            else if(Set.of("J","Q","K").contains(c.getValue())){
-                total+=10;
-            }
-            else{
-                total+=Integer.parseInt(c.getValue());
-            }
-        }
-
-        int lowValue=total+acesCount;
-        int highValue=lowValue+(acesCount>0?10:0);
-
-
-        if (highValue > 21) {
-            highValue = lowValue;
-        }
-        return new HandValue(lowValue,highValue);
-    }
 
 
 }
