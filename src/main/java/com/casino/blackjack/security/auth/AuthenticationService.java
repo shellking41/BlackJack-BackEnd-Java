@@ -178,11 +178,8 @@ public class AuthenticationService {
 
   }
   public User getAuthenticatedUser() {
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-
-
-    Object principal = authentication.getPrincipal();
+    Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
     String email;
 
     if (principal instanceof UserDetails) {

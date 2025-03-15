@@ -2,10 +2,10 @@ package com.casino.blackjack.Service;
 
 import com.casino.blackjack.DTO.GameStateRequest;
 import com.casino.blackjack.DTO.GameStateResponse;
-import com.casino.blackjack.Event.DrawCardEvent;
+import com.casino.blackjack.DTO.HandValueDTO;
+import com.casino.blackjack.Event.FlipCardEvent;
 import com.casino.blackjack.Event.GameStartedEvent;
 import com.casino.blackjack.Exception.GameStateNotFoundException;
-import com.casino.blackjack.Exception.UserNotFoundException;
 import com.casino.blackjack.Model.Card;
 import com.casino.blackjack.Model.Enums.CardType;
 import com.casino.blackjack.Model.Enums.GameStatus;
@@ -15,18 +15,16 @@ import com.casino.blackjack.Repository.GameStateRepository;
 import com.casino.blackjack.Repository.UserRepository;
 import com.casino.blackjack.security.auth.AuthenticationService;
 import com.casino.blackjack.security.config.JwtService;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -42,7 +40,7 @@ public class GameStateService {
     private final CardService cardService;
 
     @Transactional
-    public GameStateResponse StartGame(GameStateRequest gameStateRequest){
+    public GameStateResponse startGame(GameStateRequest gameStateRequest){
 
         GameState gameState=GameState
                 .builder()
@@ -74,7 +72,7 @@ public class GameStateService {
                 .build();
     }
     @Transactional
-    public GameStateResponse Stand(){
+    public GameStateResponse stand(){
         User user = authenticationService.getAuthenticatedUser();
         GameState gameState = user.getGameState();
 
@@ -85,58 +83,102 @@ public class GameStateService {
         if (gameState.getIsGameOver()) {
             throw new IllegalStateException("Game is already over.");
         }
+        List<Card> dealerCards = gameState.getCards().stream()
+                .filter(card -> card.getCardType().equals(CardType.DEALER))
+                .toList();
+        if(dealerCards.size()<2){
+            throw new IllegalStateException("Dealer has less then 2 cards");
+        }
 
         gameState.setStand(true);
+        gameState.setPlayerCardsWorth(String.valueOf(parseHandValue(gameState.getPlayerCardsWorth()).getHighValue()));
+
+
+
+
+        // Dealer kártyáinak automatikus felfordítása
+        dealerCards.forEach(card -> {
+            if (!card.getFlipped()) {
+                card.setFlipped(true);
+            }
+        });
+
         gameStateRepository.save(gameState);
+
+        Map<String,Object> updatedValues=new HashMap<>();
+        updatedValues.put("playerCardsWorth",gameState.getPlayerCardsWorth());
+        updatedValues.put("dealersCard",dealerCards);
+
 	    return GameStateResponse
 	            .builder()
 	            .isGameOver(gameState.getIsGameOver())
 	            .status(gameState.getStatus())
 	            .stand(gameState.isStand())
 	            .currentBet(gameState.getCurrentBet())
+                .updatedValues(updatedValues)
 	            .build();
     }
-
 
     @EventListener
     @Transactional
     //itt ossze adjuk a kartya erteket a gamestateba talalhato ertekkel
-    protected void updateGameStateWithCard(DrawCardEvent event){
+    protected void updateGameStateWithCard(FlipCardEvent event){
 
         GameState gameState=gameStateRepository.findById(event.getGameStateId())
                 .orElseThrow(()->new GameStateNotFoundException("Game not found"));
 
         Card card=event.getCard();
-        String cardsWorth=event.getCardsWorth();
-        int worth = Integer.parseInt(cardsWorth);
-        int cardValue=Integer.parseInt(countCardValue(card));
+        CardType cardType=card.getCardType();
+
 
 
         gameState.getCards().add(card);
-        List<Card> cards=gameState.getCards();
 
-        if (card.getCardType() == CardType.PLAYER) {
-            gameState.setPlayerCardsWorth(String.valueOf(worth + cardValue));
-        } else if (card.getCardType() == CardType.DEALER) {
-            gameState.setDealerCardsWorth(String.valueOf(worth + cardValue));
+        if (cardType == CardType.PLAYER) {
+            gameState.setPlayerCardsWorth(countCardValue(gameState,cardType).toString());
+        } else if (cardType == CardType.DEALER) {
+            gameState.setDealerCardsWorth(countCardValue(gameState,cardType).toString());
         }
 
          gameStateRepository.save(gameState);
     }
 
-    private String countCardValue(Card card){
-        String cardValue=card.getValue();
+    private HandValueDTO countCardValue(GameState gameState, CardType cardType){
+       List<Card> cards=gameState.getCards().stream()
+               .filter(c->c.getFlipped() && c.getCardType()==cardType)
+               .toList();
 
-        Set<String> faceCards=Set.of("J","Q","K");
+       int total=0;
+       int acesCount=0;
 
-        if(cardValue.equals("A")){
-            return "11";
+        for (Card c: cards){
+            if(c.getValue().equals("A")){
+                acesCount+=1;
+            }
+            else if(Set.of("J","Q","K").contains(c.getValue())){
+                total+=10;
+            }
+            else{
+                total+=Integer.parseInt(c.getValue());
+            }
         }
-        else if(faceCards.contains(cardValue)){
-            return "10";
+
+        int lowValue=total+acesCount;
+        int highValue=lowValue+(acesCount>0?10:0);
+
+
+        if (highValue > 21) {
+            highValue = lowValue;
         }
-        else{
-            return cardValue;
+        return new HandValueDTO(lowValue,highValue);
+    }
+
+    private HandValueDTO parseHandValue(String handValue) {
+        if (handValue.contains("/")) {
+            String[] values = handValue.split("/");
+            return new HandValueDTO(Integer.parseInt(values[1]), Integer.parseInt(values[0]));
         }
+        int value = Integer.parseInt(handValue);
+        return new HandValueDTO(value, value);
     }
 }

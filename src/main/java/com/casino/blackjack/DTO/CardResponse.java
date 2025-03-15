@@ -17,6 +17,7 @@ import java.util.Map;
 @NoArgsConstructor
 public class CardResponse {
 
+	private Long id;
 	@Enumerated(EnumType.STRING)
 	private Symbol symbol;
 	private String value;

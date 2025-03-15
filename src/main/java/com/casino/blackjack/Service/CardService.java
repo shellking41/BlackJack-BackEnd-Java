@@ -1,8 +1,9 @@
 package com.casino.blackjack.Service;
 
+import com.casino.blackjack.DTO.CardRequest;
 import com.casino.blackjack.DTO.CardResponse;
-import com.casino.blackjack.Event.DrawCardEvent;
-import com.casino.blackjack.Exception.UserNotFoundException;
+import com.casino.blackjack.Event.FlipCardEvent;
+import com.casino.blackjack.Exception.CardNotFoundException;
 import com.casino.blackjack.Model.Card;
 import com.casino.blackjack.Model.Enums.CardType;
 import com.casino.blackjack.Model.Enums.Symbol;
@@ -12,17 +13,12 @@ import com.casino.blackjack.security.auth.AuthenticationService;
 import com.casino.blackjack.security.config.JwtService;
 import com.casino.blackjack.Model.User;
 import com.casino.blackjack.Repository.UserRepository;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
@@ -58,49 +54,68 @@ public class CardService {
         return response;
     }
     @Transactional
-    public CardResponse DrawCard() {
+    public Card DrawCard(CardRequest cardRequest) {
         //itt megszerezzuk a usert es megnezzuk hogy van e létezik e game
         User user=authenticationService.getAuthenticatedUser();
         GameState gameState = user.getGameState();
+
         if (gameState == null || gameState.getIsGameOver()) {
             throw new IllegalStateException("The game is finished or User has no associated GameState.");
         }
-
-        Card card = RandomCard(gameState);
-        //ha a felhasznalo nem standelt akkor a playerkartyakat huzzon es szamolaj a erteket es ha igen a dealer
-        if(!gameState.isStand()) {
-            eventPublisher.publishEvent(new DrawCardEvent(this,gameState.getPlayerCardsWorth(),card,gameState.getId()));
-        }else{
-            eventPublisher.publishEvent(new DrawCardEvent(this,gameState.getDealerCardsWorth(),card,gameState.getId()));
-        }
-
+        Card card = RandomCard(gameState,cardRequest.getCardType());
         logger.info("New player card created: {} for user: {}", card, user.getEmail());
-
-        cardRepository.save(card);
-
-        Map<String,Object> values=new HashMap<>();
-        values.put("playerCardsWorth",gameState.getPlayerCardsWorth());
-        values.put("dealerCardsWorth",gameState.getDealerCardsWorth());
-
-        return CardResponse.builder()
-                .cardType(card.getCardType())
-                .symbol(card.getSymbol())
-                .value(card.getValue())
-                .flipped(card.getFlipped())
-                .worth(values)
-                .build();
+        return cardRepository.save(card);
     }
 
+     @Transactional
+     public CardResponse flipCard(Long cardId){
+
+         //itt megszerezzuk a usert es megnezzuk hogy van e létezik e game
+         User user=authenticationService.getAuthenticatedUser();
+         GameState gameState = user.getGameState();
+         if (gameState == null || gameState.getIsGameOver()) {
+             throw new IllegalStateException("The game is finished or User has no associated GameState.");
+         }
+
+         Card card= cardRepository.findById(cardId)
+                    .orElseThrow(()-> new CardNotFoundException("Card not found"));
+
+         if(card.getFlipped()){
+             throw new IllegalStateException("Card all ready flipped");
+         }
+
+         card.setFlipped(true);
+
+         if(!gameState.isStand()) {
+             eventPublisher.publishEvent(new FlipCardEvent(this,gameState.getPlayerCardsWorth(),card,gameState.getId()));
+         }else{
+             eventPublisher.publishEvent(new FlipCardEvent(this,gameState.getDealerCardsWorth(),card,gameState.getId()));
+         }
 
 
-    protected Card RandomCard(GameState gameState){
+
+         Map<String,Object> values=new HashMap<>();
+         values.put("playerCardsWorth",gameState.getPlayerCardsWorth());
+         values.put("dealerCardsWorth",gameState.getDealerCardsWorth());
+
+         return CardResponse.builder()
+                 .id(card.getId())
+                 .cardType(card.getCardType())
+                 .symbol(card.getSymbol())
+                 .value(card.getValue())
+                 .flipped(card.getFlipped())
+                 .worth(values)
+                 .build();
+     }
+
+    protected Card RandomCard(GameState gameState,CardType cardType){
         Symbol[] symbols = Symbol.values();
         String[] values = {"2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"};
 
         Random random = new Random();
         Symbol randomSymbol = symbols[random.nextInt(symbols.length)];
         String randomValue = values[random.nextInt(values.length)];
-        CardType cardType = gameState.isStand() ? CardType.DEALER : CardType.PLAYER;
+//        CardType cardType = gameState.isStand() ? CardType.DEALER : CardType.PLAYER;
 
         return Card.builder()
                 .value(randomValue)

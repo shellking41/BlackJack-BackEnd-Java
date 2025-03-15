@@ -1,9 +1,12 @@
 package com.casino.blackjack.Controller;
 
+import com.casino.blackjack.DTO.CardRequest;
 import com.casino.blackjack.DTO.CardResponse;
 import com.casino.blackjack.Model.Card;
+import com.casino.blackjack.Model.Enums.CardType;
 import com.casino.blackjack.Service.CardService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,9 +22,9 @@ public class CardController {
 
 
     @PostMapping("/DrawCard")
-    public CardResponse DrawCard() {
+    public Card DrawCard(@Valid @RequestBody CardRequest cardRequest) {
 
-        return cardService.DrawCard();
+        return cardService.DrawCard(cardRequest);
     }
 
     @GetMapping("/AllCard")
@@ -35,5 +38,10 @@ public class CardController {
 
 
         return "Megyen";
+    }
+
+    @PutMapping("/Flip/{cardId}")
+    public CardResponse flipCard(@PathVariable Long cardId){
+        return cardService.flipCard(cardId);
     }
 }

@@ -8,6 +8,7 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @NoArgsConstructor
@@ -22,9 +23,8 @@ public class GameStateResponse {
 
 	private boolean stand;
 
-
+	private Map<String,Object> updatedValues;
 	private BigDecimal currentBet;
-
 
 
 }

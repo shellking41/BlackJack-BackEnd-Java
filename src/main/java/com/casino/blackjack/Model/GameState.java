@@ -30,6 +30,7 @@ public class GameState {
 
     private boolean stand;
 
+
     private String playerCardsWorth;
 
     private String dealerCardsWorth;

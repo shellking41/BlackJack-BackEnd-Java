@@ -18,12 +18,12 @@ public class GameStateController {
 
 private final GameStateService gameStateService;
 @PostMapping("/StartGame")
-    public GameStateResponse StartGame(@Valid @RequestBody GameStateRequest gameStateRequest){
-        return gameStateService.StartGame(gameStateRequest);
+    public GameStateResponse startGame(@Valid @RequestBody GameStateRequest gameStateRequest){
+        return gameStateService.startGame(gameStateRequest);
     }
 @PutMapping("/Stand")
-    public GameStateResponse Stand(){
-    return gameStateService.Stand();
+    public GameStateResponse stand(){
+    return gameStateService.stand();
 }
 
 }

@@ -2,6 +2,7 @@ package com.casino.blackjack.Service;
 
 
 import com.casino.blackjack.Event.GameStartedEvent;
+import com.casino.blackjack.Exception.InvalidBetException;
 import com.casino.blackjack.Model.User;
 import com.casino.blackjack.Repository.UserRepository;
 import com.casino.blackjack.security.user.ChangePasswordRequest;
@@ -54,9 +55,10 @@ public class UserService {
         BigDecimal currentBet=event.getCurrentBet();
 
         if(money.compareTo(currentBet)<0){
-            throw new IllegalStateException("User doesn't have enough money");
-
+            throw new InvalidBetException("User doesn't have enough money");
         }
+
+
         BigDecimal newBalance= money.subtract(currentBet);
         user.setMoney(newBalance);
         userRepository.save(user);
