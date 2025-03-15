@@ -2,13 +2,13 @@ package com.casino.blackjack.Service;
 
 import com.casino.blackjack.DTO.GameStateRequest;
 import com.casino.blackjack.DTO.GameStateResponse;
-import com.casino.blackjack.DTO.HandValueDTO;
 import com.casino.blackjack.Event.FlipCardEvent;
 import com.casino.blackjack.Event.GameStartedEvent;
 import com.casino.blackjack.Exception.GameStateNotFoundException;
 import com.casino.blackjack.Model.Card;
 import com.casino.blackjack.Model.Enums.CardType;
 import com.casino.blackjack.Model.Enums.GameStatus;
+import com.casino.blackjack.Model.Game.HandValue;
 import com.casino.blackjack.Model.GameState;
 import com.casino.blackjack.Model.User;
 import com.casino.blackjack.Repository.GameStateRepository;
@@ -26,6 +26,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import static com.casino.blackjack.Model.Game.HandValue.parseHandValue;
 
 @Service
 @RequiredArgsConstructor
@@ -91,7 +93,7 @@ public class GameStateService {
         }
 
         gameState.setStand(true);
-        gameState.setPlayerCardsWorth(String.valueOf(parseHandValue(gameState.getPlayerCardsWorth()).getHighValue()));
+        gameState.setPlayerCardsWorth(String.valueOf(parseHandValue(gameState.getPlayerCardsWorth()).getBestValue()));
 
 
 
@@ -143,7 +145,7 @@ public class GameStateService {
          gameStateRepository.save(gameState);
     }
 
-    private HandValueDTO countCardValue(GameState gameState, CardType cardType){
+    private HandValue countCardValue(GameState gameState, CardType cardType){
        List<Card> cards=gameState.getCards().stream()
                .filter(c->c.getFlipped() && c.getCardType()==cardType)
                .toList();
@@ -170,15 +172,8 @@ public class GameStateService {
         if (highValue > 21) {
             highValue = lowValue;
         }
-        return new HandValueDTO(lowValue,highValue);
+        return new HandValue(lowValue,highValue);
     }
 
-    private HandValueDTO parseHandValue(String handValue) {
-        if (handValue.contains("/")) {
-            String[] values = handValue.split("/");
-            return new HandValueDTO(Integer.parseInt(values[1]), Integer.parseInt(values[0]));
-        }
-        int value = Integer.parseInt(handValue);
-        return new HandValueDTO(value, value);
-    }
+
 }

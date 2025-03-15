@@ -1,6 +1,7 @@
 package com.casino.blackjack.Model;
 
 import com.casino.blackjack.Model.Enums.GameStatus;
+import com.casino.blackjack.Model.Game.HandValue;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -33,6 +34,7 @@ public class GameState {
 
     private String playerCardsWorth;
 
+
     private String dealerCardsWorth;
 
     @Builder.Default
@@ -45,8 +47,8 @@ public class GameState {
 
     @PrePersist
     protected void onCreate(){
-        playerCardsWorth="0";
-        dealerCardsWorth="0";
+        playerCardsWorth = "0";
+        dealerCardsWorth = "0";
         stand=false;
     }
 
